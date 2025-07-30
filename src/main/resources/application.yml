@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      source:
+        uri: mongodb://shipai:shipai123@120.24.213.61:27017/shipai
+        # 如果需要认证:
+        # uri: mongodb://username:password@120.24.213.61:27017/shipai
+      target:
+        uri: mongodb://admin:msz%40123@192.168.0.127:27017/shipai
+        # 如果需要认证:
+        # uri: mongodb://username:password@192.168.0.127:27017/shipai
+
+bakdata:
+  mongodb:
+    day1collections:
+      - tansz3_1day
+    hour1collections:
+      - tansz3_1hour
+    min1collections:
+      - tansz3_1min
+    min5collections:
+      - tansz3_5min

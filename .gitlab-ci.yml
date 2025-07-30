@@ -1,0 +1,79 @@
+variables:
+  PROJECT_NAME: ship/data-center
+  APP_NAME: data-center
+  APP_GROUP: ship
+  APP_GROUP_ARM: arm64
+
+stages:
+  - package
+  - docker-build
+  - docker-build-arm
+  - deploy-dev
+
+# Maven 构建阶段
+package:
+  stage: package
+  image: harbor.moonsailtech.com/library/maven/msz-maven-image:v1.0.1
+  tags:
+    - package
+  variables:
+    MAVEN_OPTS: "-Dmaven.repo.local=/cache/repository"
+    MAVEN_CLI_OPTS: "-s /root/.m2/settings.xml --batch-mode"
+  script:
+    - mkdir -p /cache/repository
+    - mvn clean package -DskipTests -T 4  # 并行构建加速
+    - cp target/*.jar target/app.jar
+  cache:
+    key: "$CI_COMMIT_REF_SLUG-maven"
+    paths:
+      - /cache/repository
+  artifacts:
+    paths:
+      - target/*.jar
+    expire_in: 1 day
+
+# Docker 镜像构建阶段
+docker-build:
+  stage: docker-build
+  image: harbor.moonsailtech.com/library/docker/msz-docker-image:latest
+  tags:
+    - docker-build
+  script:
+    - echo "🚀 开始构建 Docker 镜像 ..."
+    - export version=$CI_COMMIT_REF_NAME
+    - export app=$CI_PROJECT_NAME
+    - ls -al ./
+    - ls /
+    - echo "🚀 查target文件 ..."
+    - ls -l target/
+    - version=$APP_NAME-$(date "+%Y%m%d")-$version-$CI_PIPELINE_ID
+    - docker login harbor.moonsailtech.com -u admin -p Harbor12345
+    - docker build -t harbor.moonsailtech.com/$APP_GROUP/$APP_NAME:$version .
+    - docker images | grep $APP_NAME
+    - test -z "$(docker images | grep $APP_NAME | grep $version)" && exit -1
+    - docker push harbor.moonsailtech.com/$APP_GROUP/$APP_NAME:$version
+    - echo "🚀 推送 Docker 镜像成功 ..."
+docker-build-arm:
+  stage: docker-build-arm
+  image: harbor.moonsailtech.com/library/docker/msz-docker-image:latest
+  tags:
+    - docker-build-arm
+  script:
+    - echo "🚀 开始构建 Docker 镜像 ..."
+    - export version=$CI_COMMIT_REF_NAME
+    - export app=$CI_PROJECT_NAME
+    - docker buildx use default
+    - docker buildx ls
+    - docker login harbor.moonsailtech.com -u admin -p Harbor12345
+    - version=$APP_NAME-$(date "+%Y%m%d")-$version-$CI_PIPELINE_ID
+    - docker buildx build --platform linux/arm64 -t harbor.moonsailtech.com/$APP_GROUP_ARM/$APP_NAME:$version --push   .
+    - echo "✅ 多平台镜像构建并推送成功"
+# 部署阶段
+deploy-dev:
+  stage: deploy-dev
+  image: alpine:latest
+  tags:
+    - deploy-dev
+  script:
+    - echo "📦 正在部署到开发环境..."
+    # 这里可以添加实际部署的命令，例如使用 SSH 或 API 将应用部署到开发环境
